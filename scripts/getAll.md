@@ -2,6 +2,8 @@
 
 Combine [getContent](./getContent.md) and [getForms](./getForms.md) into a single call. One browser session, one HTML snapshot — both results: Markdown content with local images and classified forms with fields.
 
+> **CLI-first.** Use this tool via CLI unless you are authoring new tooling. See `AGENTS.md` for the policy and escalation guidance.
+
 ## Quick start
 
 ### CLI
@@ -17,21 +19,9 @@ node scripts/getAll.js --dir ./output --name article.md --url https://example.co
 node scripts/getAll.js --dir ./output --name page.md --url https://example.com --launch --headless
 ```
 
-### API
+### API (advanced)
 
-```javascript
-const getAll = require('./scripts/getAll');
-
-const result = await getAll({
-  dir: './output',
-  name: 'article.md',
-  url: 'https://example.com/article',
-});
-
-console.log(result.markdown);       // Markdown with local images
-console.log(result.forms.length);   // number of forms found
-console.log(result.savedTo);        // path to the saved file
-```
+The module can also be imported from Node.js, but the recommended interface is the CLI. See the **API** section below for options and return shape.
 
 ## API
 
@@ -56,43 +46,37 @@ Accepts all options from `getContent` and `getForms`, plus:
 
 ### Result shape
 
-```javascript
+```json
 {
-  // From getContent
-  markdown: '# Page title\n\nText...\n\n![Photo](images/photo.jpg)',
-  images: [
-    { src: 'https://...', savedAs: '/abs/path/...', success: true, size: 12345 },
+  "markdown": "# Page title\n\nText...\n\n![Photo](images/photo.jpg)",
+  "images": [
+    { "src": "https://...", "savedAs": "/abs/path/...", "success": true, "size": 12345 }
   ],
-  savedTo: '/abs/path/output/article.md',
-
-  // From getForms
-  forms: [
+  "savedTo": "/abs/path/output/article.md",
+  "forms": [
     {
-      type: 'search',
-      selector: '[role="search"]',
-      confidence: 0.95,
-      fields: [
-        { tag: 'input', type: 'text', name: 'q', selector: '...' },
-      ],
-      // ... features, evidence, html
-    },
+      "type": "search",
+      "selector": "[role=\"search\"]",
+      "confidence": 0.95,
+      "fields": [{ "tag": "input", "type": "text", "name": "q", "selector": "..." }]
+    }
   ],
-
-  // Merged metadata
-  metadata: {
-    title: 'Page title',
-    lang: 'en',
-    description: '...',
-    url: 'https://example.com/article',
+  "metadata": {
+    "title": "Page title",
+    "lang": "en",
+    "description": "...",
+    "url": "https://example.com/article"
   },
-
-  // Site profile (if host matches scripts/sites/*.json)
-  site: {
-    id: 'google-search',
-    name: 'Google Search',
-    host: 'www.google.com',
-    controls: [
-      { name: 'Search input', selector: 'textarea[name="q"], input[name="q"]', actions: ['fill', 'press:Enter'] }
+  "site": {
+    "id": "google-search",
+    "name": "Google Search",
+    "host": "www.google.com",
+    "controls": [
+      {
+        "name": "Search input",
+        "selector": "textarea[name=\"q\"], input[name=\"q\"]",
+        "actions": ["fill", "press:Enter"]
+      }
     ]
   }
 }
@@ -133,52 +117,19 @@ Options:
 
 ## Examples
 
-### Full page analysis
+## Examples (CLI)
 
-```javascript
-const getAll = require('./scripts/getAll');
+```bash
+# Full page analysis: content + forms saved in one run
+node scripts/getAll.js --url https://shop.example.com/catalog --dir ./analysis --name catalog.md --forms-output ./analysis/forms.json
 
-const result = await getAll({
-  url: 'https://shop.example.com/catalog',
-  dir: './analysis',
-  name: 'catalog.md',
-  formsOutput: './analysis/forms.json',
-});
-
-// Content saved to ./analysis/catalog.md
-// Images saved to ./analysis/images/
-// Forms saved to ./analysis/forms.json
-
-// Catalog filters
-const filters = result.forms.filter(f => f.type === 'filter');
-for (const filter of filters) {
-  console.log(`Filter: ${filter.selector}`);
-  for (const field of filter.fields) {
-    if (field.tag === 'select') {
-      console.log(`  ${field.name}: ${field.options.map(o => o.text).join(', ')}`);
-    }
-  }
-}
+# Attach to an existing Chrome (CDP)
+node scripts/getAll.js --cdp http://localhost:9222 --url https://example.com --dir ./output --name page.md --forms-output ./output/forms.json
 ```
 
-### Reuse an existing browser
+## Writing custom scripts (last resort)
 
-```javascript
-const BrowserUse = require('./utils/browserUse');
-const getAll = require('./scripts/getAll');
-
-const browser = await BrowserUse.connectCDP();
-await browser.goto('https://example.com');
-
-const result = await getAll({
-  browser,
-  dir: './output',
-  name: 'page.md',
-});
-
-// browser is NOT closed — ownsInstance === false
-await browser.close();
-```
+If you need multi-step interactions not supported by the CLI (login flows, infinite scroll, complex UI state), consider a minimal script that composes `utils/browserUse` + `scripts/getAll` API. Do this only when you are confident in the site structure/selectors. See `AGENTS.md` for the policy.
 
 ## Dependencies
 

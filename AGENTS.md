@@ -2,6 +2,14 @@
 
 Local toolkit for working with web pages: control a real Chrome instance, extract structured data from HTML, save pages as Markdown (with downloaded images), and automate Google Search.
 
+## Policy: CLI-first (default)
+
+Prefer invoking existing tools as **CLI commands** from the terminal (for example: `node scripts/getContent.js --dir ./output --name article.md --url https://example.com`).
+
+- Use the CLI tools in `scripts/` and `utils/` first.
+- Avoid writing new JavaScript scripts. Only write code when there is no CLI command/flag that can do the job.
+- If you do write code, only compose existing modules from this repo (`scripts/*`, `utils/*`) — do not re-implement browser automation.
+
 ## When to use
 
 Use the utilities and scripts in this repository when the task involves:
@@ -11,7 +19,7 @@ Use the utilities and scripts in this repository when the task involves:
 - saving a page to Markdown with image downloading;
 - automating Google Search (collecting links, iterating results).
 
-Do **not** write fetch/puppeteer/playwright code from scratch — there are production-ready wrappers here.
+Do **not** write new browser automation scripts from scratch. Prefer the CLI tools in this repo; use the Node.js APIs only when you need programmatic control.
 
 ## IMPORTANT: single-threaded access to the browser
 
@@ -63,13 +71,10 @@ scripts/
 
 Use this when you need **direct** browser control: navigation, clicks, form filling, scrolling (including infinite scroll), screenshots, downloading images/files, running JS on the page, tab management. Main modes: `launchCDP` (recommended; background Chrome + CDP), `launch` (persistent profile), and `connectCDP` (attach to an already-running Chrome).
 
-```javascript
-const BrowserUse = require("./utils/browserUse");
-const browser = await BrowserUse.launch();
-await browser.goto("https://example.com");
-await browser.fill("#search", "query");
-await browser.click('button[type="submit"]');
-await browser.close();
+CLI (recommended):
+
+```bash
+node utils/browserUse.js https://example.com --html page.html
 ```
 
 ### getDataFromText — parse HTML
@@ -78,26 +83,21 @@ await browser.close();
 
 Use this when you have **raw HTML** (string or file) and need structured blocks extracted from it: navigation, main content (as Markdown), forms with classification. Works without a browser.
 
-```javascript
-const getDataFromText = require("./utils/getDataFromText");
-const data = getDataFromText(htmlString);
-// data.metadata, data.navigation, data.content, data.forms
+CLI:
+
+```bash
+node utils/getDataFromText.js page.html output.json
 ```
 
 ## Scripts (high level)
 
-All scripts can be used both as API modules (`require`) and as a CLI. They auto-detect the connection mode: if Chrome is running with CDP — they connect to it; otherwise they launch a new instance.
+All scripts can be used as a CLI (recommended) and also as API modules. They auto-detect the connection mode: if Chrome is running with CDP — they connect to it; otherwise they launch a new instance.
 
 ### getContent — Markdown content with images
 
 [Docs](scripts/getContent.md) | [Code](scripts/getContent.js)
 
 Use when you need to **save the page content as a Markdown file** with downloaded images and rewritten links to local files.
-
-```javascript
-const getContent = require("./scripts/getContent");
-const result = await getContent({ dir: "./output", name: "article.md" });
-```
 
 ```bash
 node scripts/getContent.js --dir ./output --name article.md --url https://example.com
@@ -109,12 +109,6 @@ node scripts/getContent.js --dir ./output --name article.md --url https://exampl
 
 Use when you need to **find and analyze forms** on a page: search, login, filters, contact forms. Returns classification and ready-to-use CSS selectors for fields compatible with `browser.fill()` / `browser.fillForm()`.
 
-```javascript
-const getForms = require("./scripts/getForms");
-const { forms } = await getForms({ url: "https://example.com" });
-const searchForm = forms.find((f) => f.type === "search");
-```
-
 ```bash
 node scripts/getForms.js --url https://example.com --output forms.json
 ```
@@ -124,12 +118,6 @@ node scripts/getForms.js --url https://example.com --output forms.json
 [Docs](scripts/getAll.md) | [Code](scripts/getAll.js)
 
 Use when you need **both content and forms** in a single call. One HTML snapshot, one browser session — both results.
-
-```javascript
-const getAll = require("./scripts/getAll");
-const result = await getAll({ dir: "./output", name: "page.md" });
-// result.markdown, result.forms, result.images
-```
 
 ```bash
 node scripts/getAll.js --dir ./output --name page.md --forms-output forms.json
@@ -142,21 +130,6 @@ node scripts/getAll.js --dir ./output --name page.md --forms-output forms.json
 Use when you need to **automate Google Search**: find links for a query, iterate results, extract content from discovered pages. Filters ads. Supports pagination.
 
 If `dir` is passed (CLI: `--dir`, API: `linksDir`), `getLinks()` automatically saves results to **`links.json`** in that directory. This is critical for deep research: you can continue later without repeating the search (and without relying on a changing SERP), by following URLs already saved.
-
-```javascript
-const GoogleSearch = require("./scripts/googleSearch");
-const google = new GoogleSearch();
-await google.init();
-await google.search("playwright tutorial");
-const links = await google.getLinks();
-await google.openLink(0);
-const content = await google.getContent({
-  dir: "./output",
-  name: "article.md",
-});
-await google.closeTab();
-await google.close();
-```
 
 ```bash
 node scripts/googleSearch.js "playwright tutorial" --links
@@ -174,7 +147,7 @@ The deep-research methodology is described in [RESEARCH.md](RESEARCH.md).
 | Navigation, clicks, scrolling, screenshots, typing | `utils/browserUse` |
 | Parse ready HTML without a browser | `utils/getDataFromText` |
 | Save a page to Markdown with images | `scripts/getContent` |
-| Extract text from a PDF | `browser.getPdfText(url)` or `scripts/getContent` (auto-detect) |
+| Extract text from a PDF | `scripts/getContent` (auto-detect) |
 | Discover what forms exist on a page | `scripts/getForms` |
 | Content + forms in one call | `scripts/getAll` |
 | Google Search + iterate results | `scripts/googleSearch` |
@@ -204,98 +177,50 @@ Many pages render content via JavaScript (SPAs, dynamic pages, lazy-loading). A 
 
 ### Level 1: Standard load (default)
 
-```javascript
-await browser.goto(url);
-const html = await browser.getHtml();
+CLI (recommended):
+
+```bash
+node scripts/getContent.js --url https://example.com --dir ./output --name page.md
 ```
 
-By default, `goto` waits for `load` (all resources loaded, including scripts). Scripts `getContent` and `googleSearch.openLink` additionally wait for `networkidle` (5 seconds). For many pages this is enough.
+Scripts `getContent` and `googleSearch.openLink` wait for `networkidle` by default (5 seconds). For many pages this is enough.
 
 ### Level 2: Wait for content stabilization
 
-If the content is empty/minimal — the page renders via JS after load. Use `gotoAndWaitForContent`:
+If the content is empty/minimal — the page likely renders via JS after load. Prefer a CLI “wait + extract” run:
 
-```javascript
-await browser.gotoAndWaitForContent(url);
-const html = await browser.getHtml();
+```bash
+node utils/browserUse.js https://example.com --wait ".article-body" --extract output.json
 ```
 
-This method waits for `load` → `networkidle` → DOM stabilization (content stops changing). You can also pass a key CSS selector:
-
-```javascript
-await browser.gotoAndWaitForContent(url, { waitForSelector: ".article-body" });
-```
-
-Or call `waitForContentReady()` after navigation:
-
-```javascript
-await browser.goto(url);
-await browser.waitForContentReady({ timeout: 10000 });
-```
+This waits for the key selector and then extracts structured blocks via `getDataFromText` (including Markdown inside `content[].markdown`).
 
 ### Level 3: Raw extraction via `evaluate` + manual parsing
 
-If Markdown conversion via `getDataFromText` returns empty content but the page is visibly loaded, the data may be inside Shadow DOM, iframes, or site-specific containers. Extract text directly:
-
-```javascript
-await browser.gotoAndWaitForContent(url);
-
-// Extract all visible text
-const text = await browser.evaluate(() => document.body.innerText);
-
-// Extract HTML of a specific container
-const articleHtml = await browser.evaluate(
-  () => document.querySelector("article, main, .content")?.innerHTML || "",
-);
-
-// Parse raw HTML with a no-browser utility
-const getDataFromText = require("./utils/getDataFromText");
-const data = getDataFromText(articleHtml);
-```
+If extraction still returns empty content but the page is visibly loaded, the data may be inside Shadow DOM, iframes, or site-specific containers. This usually requires **programmatic** browser access (API) to extract targeted `innerText` / container HTML and then parse via `getDataFromText`. Treat this as an advanced / last-resort step.
 
 ### Level 4: Screenshot + visual analysis
 
 If text content is not programmatically accessible (canvas rendering, anti-scraping measures, complex layouts):
 
-```javascript
-await browser.gotoAndWaitForContent(url);
-await browser.screenshot({ path: "page.png", fullPage: true });
+```bash
+node utils/browserUse.js https://example.com --screenshot page.png --full-page
 ```
 
-Analyze the screenshot visually. For content outside the viewport — scroll and take multiple screenshots:
-
-```javascript
-const screenshots = [];
-for (let i = 0; i < 5; i++) {
-  await browser.screenshot({ path: `page-part-${i}.png` });
-  const result = await browser.scroll({ direction: "down" });
-  await browser.wait(1000);
-  if (result.reachedBottom) break;
-}
-```
+Analyze the screenshot visually.
 
 ### Level 5: Scroll + re-collect for lazy-loaded / infinite-scroll pages
 
-Pages with infinite scroll or lazy-loaded blocks load content on scroll. Scroll before extracting:
-
-```javascript
-await browser.gotoAndWaitForContent(url);
-
-// Scroll to load additional content
-await browser.scroll({ times: 10, delay: 1500 });
-
-// Now all loaded content is available in the DOM
-const html = await browser.getHtml();
-```
+Pages with infinite scroll or lazy-loaded blocks load content only on scroll. Fully automated scrolling currently requires **programmatic** control (API) via `utils/browserUse`. Treat this as an advanced / last-resort step and only automate it when you’re confident about the site structure and selectors.
 
 ### Summary table
 
 | Symptom | Action |
 | --- | --- |
-| Content is empty (0 chars) | Level 2: `gotoAndWaitForContent` |
-| Content is minimal (header/menu only) | Level 3: `evaluate(() => document.body.innerText)` |
-| Text is not accessible programmatically | Level 4: `screenshot({ fullPage: true })` |
-| Content loads on scroll | Level 5: `scroll({ times: N })` before `getHtml()` |
+| Content is empty (0 chars) | Level 2: `node utils/browserUse.js <url> --wait "<selector>" --extract out.json` |
+| Content is minimal (header/menu only) | Level 3: advanced API extraction (`evaluate` / container HTML) |
+| Text is not accessible programmatically | Level 4: `node utils/browserUse.js <url> --screenshot page.png --full-page` |
+| Content loads on scroll | Level 5: advanced API scrolling (`browser.scroll({ times: N })`) |
 | Page is blocked / CAPTCHA | See “Page blockers” section |
 
 **Rule:** if a page is critical for the research, **do not skip it silently**. Go through all escalation levels. Only if none works — record in your insights that content could not be extracted, and move on.
@@ -306,21 +231,10 @@ PDF links in Google results are common (papers, reports, whitepapers). Chrome ex
 
 **Automatic handling:** `getContent` and `googleSearch` automatically detect PDF links (by `.pdf` extension) and extract text via `getPdfText()` instead of navigating. No additional actions are required — the standard `openLink → getContent → closeTab` flow works for PDFs unchanged.
 
-**Manual usage** (when you need finer control):
+**CLI usage (recommended):**
 
-```javascript
-// Extract text from a PDF
-const { text, totalPages } = await browser.getPdfText(
-  "https://example.com/paper.pdf",
-);
-
-// Universal navigation (auto-detect PDF)
-const result = await browser.gotoOrPdf(url);
-if (result.isPdf) {
-  // result.text — PDF text
-} else {
-  // regular page content is in the DOM
-}
+```bash
+node scripts/getContent.js --url https://example.com/paper.pdf --dir ./output --name paper.md
 ```
 
 **Limitations of PDF extraction:**
@@ -328,3 +242,7 @@ if (result.isPdf) {
 - Only text is extracted — tables, formulas, and diagrams may lose formatting.
 - Scanned PDFs (images instead of text) will return empty text — use screenshots in this case.
 - Password-protected PDFs cannot be processed.
+
+## Writing custom scripts (last resort)
+
+If you are confident about a site’s structure/selectors and need multi-step, repeatable automation that the CLI tools do not support (e.g. login flows, infinite scroll, complex UI state), you may write a small script. Keep it minimal: compose existing modules from this repo (`scripts/*`, `utils/*`), and avoid re-implementing browser automation.

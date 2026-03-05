@@ -2,6 +2,8 @@
 
 Extract Markdown content from the current (or specified) browser page. Downloads images from content blocks and rewrites Markdown image links to local paths. Saves the result to a file.
 
+> **CLI-first.** Use this tool via CLI unless you are authoring new tooling. See `AGENTS.md` for the policy and escalation guidance.
+
 ## Quick start
 
 ### CLI
@@ -17,20 +19,9 @@ node scripts/getContent.js --dir ./output --name article.md --url https://exampl
 node scripts/getContent.js --dir ./output --name article.md --url https://example.com --launch --headless
 ```
 
-### API
+### API (advanced)
 
-```javascript
-const getContent = require('./scripts/getContent');
-
-const result = await getContent({
-  dir: './output',
-  name: 'article.md',
-});
-
-console.log(result.markdown);       // Markdown with local image paths
-console.log(result.savedTo);        // absolute path to the saved file
-console.log(result.images.length);  // number of downloaded images
-```
+The module can also be imported from Node.js, but the recommended interface is the CLI. See the **API** section below for options and return shape.
 
 ## API
 
@@ -54,36 +45,40 @@ console.log(result.images.length);  // number of downloaded images
 
 ### Result shape
 
-```javascript
+```json
 {
-  markdown: '# Page title\n\nArticle text...\n\n![Photo](images/photo.jpg)',
-  images: [
+  "markdown": "# Page title\n\nArticle text...\n\n![Photo](images/photo.jpg)",
+  "images": [
     {
-      src: 'https://example.com/photo.jpg',
-      alt: 'Photo',
-      savedAs: '/abs/path/output/images/photo.jpg',
-      size: 145832,
-      success: true,
+      "src": "https://example.com/photo.jpg",
+      "alt": "Photo",
+      "savedAs": "/abs/path/output/images/photo.jpg",
+      "size": 145832,
+      "success": true
     },
     {
-      src: 'https://example.com/broken.png',
-      alt: '',
-      success: false,
-      error: 'HTTP 404',
-    },
+      "src": "https://example.com/broken.png",
+      "alt": "",
+      "success": false,
+      "error": "HTTP 404"
+    }
   ],
-  savedTo: '/abs/path/output/article.md',
-  metadata: {
-    title: 'Page title',
-    lang: 'en',
-    description: '...',
+  "savedTo": "/abs/path/output/article.md",
+  "metadata": {
+    "title": "Page title",
+    "lang": "en",
+    "description": "..."
   },
-  site: {
-    id: 'google-search',
-    name: 'Google Search',
-    host: 'www.google.com',
-    controls: [
-      { name: 'Search input', selector: 'textarea[name="q"], input[name="q"]', actions: ['fill', 'press:Enter'] }
+  "site": {
+    "id": "google-search",
+    "name": "Google Search",
+    "host": "www.google.com",
+    "controls": [
+      {
+        "name": "Search input",
+        "selector": "textarea[name=\"q\"], input[name=\"q\"]",
+        "actions": ["fill", "press:Enter"]
+      }
     ]
   }
 }
@@ -148,80 +143,22 @@ Options:
 
 Operational logs go to stderr, data goes to stdout.
 
-## Examples
+## Examples (CLI)
 
-### Extract an article with images
+```bash
+# Extract an article with images
+node scripts/getContent.js --url https://example.com/blog/post --dir ./articles/post-1 --name content.md --image-subdir img --min-width 200
 
-```javascript
-const getContent = require('./scripts/getContent');
+# Reuse an already running Chrome (CDP)
+node scripts/getContent.js --cdp http://localhost:9222 --url https://example.com --dir ./output --name page.md
 
-const result = await getContent({
-  url: 'https://example.com/blog/post',
-  dir: './articles/post-1',
-  name: 'content.md',
-  imageSubdir: 'img',
-  minWidth: 200,
-});
-
-// Output structure:
-//   articles/post-1/content.md     — markdown with ![...](img/photo.jpg)
-//   articles/post-1/img/photo.jpg  — downloaded image
+# YouTube watch page (adds title/description/transcript/comments when available)
+node scripts/getContent.js --url "https://www.youtube.com/watch?v=VIDEO_ID" --dir ./output --name video.md
 ```
 
-### Reuse an existing browser
+## Writing custom scripts (last resort)
 
-```javascript
-const BrowserUse = require('./utils/browserUse');
-const getContent = require('./scripts/getContent');
-
-const browser = await BrowserUse.connectCDP();
-await browser.goto('https://example.com');
-
-const result = await getContent({
-  browser,         // reused, not closed after the call
-  dir: './output',
-  name: 'page.md',
-});
-
-// browser stays open
-await browser.close();
-```
-
-### Infinite scroll: load content before extracting
-
-```javascript
-const BrowserUse = require('./utils/browserUse');
-const getContent = require('./scripts/getContent');
-
-const browser = await BrowserUse.connectCDP();
-await browser.goto('https://news.example.com/feed');
-
-// Scroll the feed to load all items
-await browser.scroll({ times: 15, delay: 2000, timeout: 45000 });
-
-// Extract full content (including content loaded on scroll)
-const result = await getContent({
-  browser,
-  dir: './output',
-  name: 'feed.md',
-});
-
-await browser.close();
-```
-
-### With pre-fetched HTML
-
-```javascript
-const getContent = require('./scripts/getContent');
-
-const result = await getContent({
-  browser: myBrowser,
-  html: '<html>...</html>',   // HTML comes from here
-  downloadImages: true,       // images are still downloaded from the DOM (if you need a full result)
-  dir: './output',
-  name: 'page.md',
-});
-```
+If you need multi-step interactions not supported by the CLI (login flows, infinite scroll, complex UI state), consider a minimal script that composes `utils/browserUse` + `scripts/getContent` API. Do this only when you are confident in the site structure/selectors. See `AGENTS.md` for the policy.
 
 ## Dependencies
 

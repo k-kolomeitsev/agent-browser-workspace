@@ -1,0 +1,110 @@
+{
+  "id": "reddit",
+  "name": "Reddit",
+  "hosts": [
+    "www.reddit.com",
+    "reddit.com",
+    "old.reddit.com"
+  ],
+  "baseUrl": "https://www.reddit.com",
+  "scraping": {
+    "selectors": {
+      "searchInput": "header input[name=\"q\"], header input[type=\"search\"], input[name=\"q\"], input[type=\"search\"]",
+      "subredditPosts": "shreddit-post",
+      "postPermalinkAnchor": "a[href*=\"/comments/\"]",
+      "commentsTree": "shreddit-comment-tree, [data-testid=\"comment-tree\"], [data-testid=\"comments-page\"]",
+      "comment": "shreddit-comment, [data-testid=\"comment\"]",
+      "expandMoreRepliesButton": "button:has-text(\"more reply\"), button:has-text(\"more replies\"), button:has-text(\"More replies\"), button:has-text(\"ещё\")",
+      "commentComposerTrigger": "comment-composer-host [data-testid=\"trigger-button\"], faceplate-textarea-input[data-testid=\"trigger-button\"]",
+      "commentEditor": "div[role=\"textbox\"][contenteditable=\"true\"][aria-placeholder*=\"conversation\" i], div[role=\"textbox\"][contenteditable=\"true\"][aria-placeholder*=\"comment\" i], div[role=\"textbox\"][contenteditable=\"true\"][aria-label*=\"comment\" i], textarea[name=\"comment\"], textarea[placeholder*=\"comment\" i], div[role=\"textbox\"][contenteditable=\"true\"], textarea",
+      "commentSubmitButton": "button[type=\"submit\"]:has-text(\"Comment\"), button[type=\"submit\"]"
+    },
+    "reddit": {
+      "defaultSubredditPath": "/r/{name}/hot/",
+      "defaultScroll": { "times": 12, "delay": 2500 },
+      "maxPostsToConsider": 60,
+      "preferPermalinkOverContentHref": true
+    }
+  },
+  "controls": {
+    "items": [
+      {
+        "name": "Поиск Reddit (поле ввода)",
+        "selectorKey": "searchInput",
+        "description": "Поле глобального поиска Reddit. Обычно достаточно заполнить и нажать Enter. Если видишь модалку cookie/consent — закрой её вручную, иначе поиск может не фокусироваться.",
+        "actions": [
+          "fill",
+          "press:Enter"
+        ]
+      },
+      {
+        "name": "Посты в сабреддите (лента)",
+        "selectorKey": "subredditPosts",
+        "description": "Карточки постов (новый интерфейс Reddit). Для получения большего количества постов прокручивай ленту. Метаданные поста часто доступны как атрибуты `post-title`, `score`, `comment-count`, `permalink`, `content-href`, `flair-text`.",
+        "actions": [
+          "scroll:times=12,delay=2500",
+          "evaluate:extractPostsFrom(shreddit-post)"
+        ]
+      },
+      {
+        "name": "Ссылка на страницу обсуждения (permalink)",
+        "selectorKey": "postPermalinkAnchor",
+        "description": "Ссылка, ведущая на страницу комментариев (`/comments/`). Для действий с комментариями (чтение/ответ) лучше открывать именно permalink, а не media/external `content-href`.",
+        "actions": [
+          "click"
+        ]
+      },
+      {
+        "name": "Дерево комментариев (контейнер)",
+        "selectorKey": "commentsTree",
+        "description": "Контейнер с комментариями на странице поста. Иногда Reddit подгружает комментарии лениво — прокрути к этому блоку и подожди.",
+        "actions": [
+          "scrollIntoView",
+          "waitFor:comment"
+        ]
+      },
+      {
+        "name": "Комментарий (элемент)",
+        "selectorKey": "comment",
+        "description": "Один комментарий в треде. Для чтения «топа» обычно достаточно первых 5–15 элементов после сортировки по Best/Top.",
+        "actions": [
+          "readText"
+        ]
+      },
+      {
+        "name": "Раскрыть больше ответов (More replies)",
+        "selectorKey": "expandMoreRepliesButton",
+        "description": "Кнопки раскрытия веток («more replies / ещё ответы»). Нажимай осторожно: это генерирует дополнительные сетевые запросы и может усилить антибот-защиту.",
+        "actions": [
+          "click"
+        ]
+      },
+      {
+        "name": "Открыть форму комментария (Join the conversation)",
+        "selectorKey": "commentComposerTrigger",
+        "description": "На некоторых постах верхний композер комментария изначально свёрнут. Клик по trigger-контролу (обычно `data-testid=\"trigger-button\"` с плейсхолдером \"Join the conversation\") разворачивает форму и делает доступным реальный редактор. На текущем Reddit это часто `faceplate-textarea-input` со **shadow DOM**: иногда нужно кликать по внутреннему `<textarea>` внутри shadowRoot (через `evaluate`), а не по самому хост-элементу.",
+        "actions": [
+          "click"
+        ]
+      },
+      {
+        "name": "Редактор комментария",
+        "selectorKey": "commentEditor",
+        "description": "Поле ввода комментария. На Reddit на странице поста часто есть **несколько** `contenteditable` — надёжнее выбирать редактор по `aria-placeholder` (например, \"Join the conversation\") или по контексту блока «Add a comment».",
+        "actions": [
+          "click",
+          "type"
+        ]
+      },
+      {
+        "name": "Отправка комментария (submit)",
+        "selectorKey": "commentSubmitButton",
+        "description": "Кнопка отправки (обычно с текстом \"Comment\"). Может быть несколько submit-кнопок на странице (в т.ч. внутри reply-веток) — лучше кликать submit рядом с активным редактором комментария.",
+        "actions": [
+          "click"
+        ]
+      }
+    ]
+  }
+}
+

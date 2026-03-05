@@ -2,6 +2,8 @@
 
 Extract all forms from the current (or specified) browser page with automatic classification (search, auth, filter, contact, subscribe, generic) and field parsing. Each field gets a ready-to-use CSS selector compatible with `browser.fill()` / `browser.fillForm()`.
 
+> **CLI-first.** Use this tool via CLI unless you are authoring new tooling. See `AGENTS.md` for the policy and escalation guidance.
+
 ## Quick start
 
 ### CLI
@@ -17,22 +19,9 @@ node scripts/getForms.js --url https://example.com --output forms.json
 node scripts/getForms.js --cdp http://localhost:9333 --output forms.json
 ```
 
-### API
+### API (advanced)
 
-```javascript
-const getForms = require('./scripts/getForms');
-
-const { forms, metadata } = await getForms({
-  url: 'https://example.com',
-});
-
-for (const form of forms) {
-  console.log(`[${form.type}] ${form.selector}`);
-  for (const field of form.fields) {
-    console.log(`  ${field.tag}[${field.type}] → ${field.selector}`);
-  }
-}
-```
+The module can also be imported from Node.js, but the recommended interface is the CLI. See the **API** section below for options and return shape.
 
 ## API
 
@@ -50,62 +39,66 @@ for (const form of forms) {
 
 ### Result shape
 
-```javascript
+```json
 {
-  forms: [
+  "forms": [
     {
-      type: 'search',              // search | auth | filter | contact | subscribe | generic
-      selector: '[role="search"]',
-      confidence: 0.95,
-      tier: 1,
-      evidence: ['role:search', 'has_search_input'],
-      features: {
-        inputCount: 1,
-        selectCount: 0,
-        textareaCount: 0,
-        buttonCount: 1,
-        hasPasswordInput: false,
-        hasSearchInput: true,
-        hasSubmitButton: true,
-        action: '/search',
-        method: 'GET',
+      "type": "search",
+      "selector": "[role=\"search\"]",
+      "confidence": 0.95,
+      "tier": 1,
+      "evidence": ["role:search", "has_search_input"],
+      "features": {
+        "inputCount": 1,
+        "selectCount": 0,
+        "textareaCount": 0,
+        "buttonCount": 1,
+        "hasPasswordInput": false,
+        "hasSearchInput": true,
+        "hasSubmitButton": true,
+        "action": "/search",
+        "method": "GET"
       },
-      html: '<form action="/search">...</form>',
-      fields: [
+      "html": "<form action=\"/search\">...</form>",
+      "fields": [
         {
-          tag: 'input',
-          type: 'text',
-          name: 'q',
-          id: 'search-input',
-          placeholder: 'Search...',
-          value: '',
-          selector: '[role="search"] #search-input',
+          "tag": "input",
+          "type": "text",
+          "name": "q",
+          "id": "search-input",
+          "placeholder": "Search...",
+          "value": "",
+          "selector": "[role=\"search\"] #search-input"
         },
         {
-          tag: 'button',
-          type: 'submit',
-          name: '',
-          id: '',
-          placeholder: '',
-          value: '',
-          selector: '[role="search"] button[type="submit"]',
-          text: 'Search',
-        },
-      ],
-    },
+          "tag": "button",
+          "type": "submit",
+          "name": "",
+          "id": "",
+          "placeholder": "",
+          "value": "",
+          "selector": "[role=\"search\"] button[type=\"submit\"]",
+          "text": "Search"
+        }
+      ]
+    }
   ],
-  metadata: {
-    title: 'Page title',
-    lang: 'en',
-    description: '...',
-    url: 'https://example.com',
+  "metadata": {
+    "title": "Page title",
+    "lang": "en",
+    "description": "...",
+    "url": "https://example.com"
   },
-  site: {
-    id: 'google-search',
-    name: 'Google Search',
-    host: 'www.google.com',
-    controls: [
-      { name: 'Search input', selector: 'textarea[name="q"], input[name="q"]', actions: ['fill', 'press:Enter'] }
+  "site": {
+    "id": "google-search",
+    "name": "Google Search",
+    "host": "www.google.com",
+    "controls": [
+      {
+        "name": "Search input",
+        "selector": "textarea[name=\"q\"], input[name=\"q\"]",
+        "actions": ["fill", "press:Enter"]
+      }
     ]
   }
 }
@@ -159,49 +152,19 @@ Options:
 
 When printing to stdout, forms are shown in a shortened format (no full HTML, only a preview).
 
-## Examples
+## Examples (CLI)
 
-### Extract forms and fill via `browser`
+```bash
+# Navigate and save all detected forms to JSON
+node scripts/getForms.js --url https://example.com --output ./output/forms.json
 
-```javascript
-const BrowserUse = require('./utils/browserUse');
-const getForms = require('./scripts/getForms');
-
-const browser = await BrowserUse.connectCDP();
-await browser.goto('https://example.com');
-
-const { forms } = await getForms({ browser });
-
-const searchForm = forms.find(f => f.type === 'search');
-if (searchForm) {
-  const queryField = searchForm.fields.find(f => f.name === 'q' || f.type === 'text');
-  if (queryField) {
-    await browser.fill(queryField.selector, 'my query');
-  }
-
-  const submitBtn = searchForm.fields.find(f => f.type === 'submit');
-  if (submitBtn) {
-    await browser.click(submitBtn.selector);
-  }
-}
-
-await browser.close();
+# Attach to an existing Chrome (CDP) and extract from the current page
+node scripts/getForms.js --cdp http://localhost:9222 --output forms.json
 ```
 
-### Login / auth form discovery
+## Writing custom scripts (last resort)
 
-```javascript
-const getForms = require('./scripts/getForms');
-
-const { forms } = await getForms({
-  url: 'https://app.example.com/login',
-  launch: true,
-});
-
-const authForm = forms.find(f => f.type === 'auth');
-// authForm.fields → email, password, submit button
-// authForm.fields[0].selector → ready-to-use CSS selector
-```
+If you need to actually fill/submit forms as part of a repeatable automation flow, you will need programmatic browser control (API) via `utils/browserUse`. Do this only when you’re confident about the site structure/selectors. See `AGENTS.md` for the policy.
 
 ## Dependencies
 

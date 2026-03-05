@@ -2,6 +2,8 @@
 
 `GoogleSearch` is a class for step-by-step control of Google Search. Each operation is a separate method: run a search, collect links (without ads), open a result in a new tab, extract content, return to results, paginate.
 
+> **CLI-first.** Use the CLI interface for agent tasks. The API is intended for tool authors and advanced integrations. See `AGENTS.md` for the policy.
+
 ## Quick start
 
 ### CLI
@@ -20,24 +22,9 @@ node scripts/googleSearch.js "web scraping" --page 2 --links
 node scripts/googleSearch.js "web scraping" --links --dir ./archive/my-research
 ```
 
-### API
+### API (advanced)
 
-```javascript
-const GoogleSearch = require('./scripts/googleSearch');
-
-const google = new GoogleSearch();
-await google.init();
-
-await google.search('node.js best practices');
-const links = await google.getLinks();
-console.log(`Found ${links.length} links`);
-
-await google.openLink(0);
-const content = await google.getContent({ dir: './output', name: 'article.md' });
-await google.closeTab();
-
-await google.close();
-```
+The class can also be used programmatically from Node.js, but the recommended interface is the CLI. See the **API** section below for options and behavior.
 
 ## API
 
@@ -226,87 +213,11 @@ Closes the browser (only if the instance was created by this object).
 await google.close();
 ```
 
-## Full examples
-
-### Search and walk the first 3 links
-
-```javascript
-const GoogleSearch = require('./scripts/googleSearch');
-
-const google = new GoogleSearch();
-await google.init();
-
-await google.search('playwright automation');
-const links = await google.getLinks();
-
-for (let i = 0; i < Math.min(3, links.length); i++) {
-  console.log(`[${i}] ${links[i].title}`);
-  await google.openLink(i);
-
-  const content = await google.getContent({
-    dir: `./results/link-${i}`,
-    name: 'content.md',
-  });
-
-  console.log(`  Saved: ${content.savedTo} (${content.markdown.length} chars)`);
-  await google.closeTab();
-}
-
-await google.close();
-```
-
-### Collect links across multiple pages
-
-```javascript
-const GoogleSearch = require('./scripts/googleSearch');
-
-const google = new GoogleSearch({ launch: true });
-await google.init();
-
-await google.search('web scraping tools 2025');
-
-const allLinks = [];
-
-for (let page = 1; page <= 3; page++) {
-  const links = await google.getLinks();
-  allLinks.push(...links);
-  console.log(`Page ${page}: ${links.length} links`);
-
-  if (page < 3) {
-    await google.goToPage();
-  }
-}
-
-console.log(`Total: ${allLinks.length} links`);
-await google.close();
-```
-
-### With an existing browser
-
-```javascript
-const BrowserUse = require('./utils/browserUse');
-const GoogleSearch = require('./scripts/googleSearch');
-
-const browser = await BrowserUse.connectCDP();
-
-const google = new GoogleSearch({ browser });
-await google.init();
-
-await google.search('my query');
-const links = await google.getLinks();
-
-await google.close();
-// browser is NOT closed — it was passed from outside
-await browser.close();
-```
-
 ## Google selectors
 
 Google selectors are stored in the profile `scripts/sites/google-search.json` and exported as `GOOGLE_SELECTORS` for easy updates when Google changes markup:
 
-```javascript
-const { GOOGLE_SELECTORS } = require('./scripts/googleSearch');
-```
+Export: `GOOGLE_SELECTORS` from `scripts/googleSearch.js`.
 
 | Key | Selector | Description |
 |------|----------|-------------|

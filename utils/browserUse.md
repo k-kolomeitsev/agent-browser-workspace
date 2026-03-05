@@ -2,6 +2,8 @@
 
 Control a real Google Chrome instance via [Playwright](https://playwright.dev/). Supports three modes: auto-start Chrome with CDP (`launchCDP`), launch a persistent profile (`launch`), or connect to an existing Chrome via CDP (`connectCDP`). Includes navigation, form filling, screenshots, image/file downloads, and PDF text extraction. Integrates with `getDataFromText` for extracting structured data from live pages.
 
+> **CLI-first.** Prefer using `node utils/browserUse.js ...` for tasks. The API sections below are for tool authors and advanced integrations. See `AGENTS.md` for the policy.
+
 ## Install
 
 ```bash
@@ -39,23 +41,9 @@ node utils/browserUse.js https://example.com --headless --html page.html
 node utils/browserUse.js https://example.com --wait ".content" --html page.html
 ```
 
-### API
+### API (advanced)
 
-```javascript
-const BrowserUse = require('./utils/browserUse');
-
-// Launch Chrome with a persistent profile
-const browser = await BrowserUse.launch();
-await browser.goto('https://example.com');
-const html = await browser.getHtml();
-await browser.close();
-
-// Connect to an already-running Chrome via CDP
-const browser2 = await BrowserUse.connectCDP();
-await browser2.goto('https://example.com');
-const html2 = await browser2.getHtml();
-await browser2.close();
-```
+The module can also be used programmatically from Node.js, but the recommended interface is the CLI. See the sections below for details.
 
 ## Three operating modes
 
@@ -575,107 +563,10 @@ await BrowserUse.shutdown({ port: 9333 });
 
 ## Integration with getDataFromText
 
-```javascript
-const BrowserUse = require('./utils/browserUse');
-const getDataFromText = require('./utils/getDataFromText');
-
-const browser = await BrowserUse.launch();
-await browser.goto('https://example.com/article');
-const html = await browser.getHtml();
-await browser.close();
-
-const data = getDataFromText(html);
-// data.metadata, data.navigation, data.content, data.forms
-```
-
 Via CLI — one command:
 
 ```bash
 node utils/browserUse.js https://example.com/article --extract output.json
-```
-
-## Full examples
-
-### Login + dashboard screenshot
-
-```javascript
-const BrowserUse = require('./utils/browserUse');
-
-const browser = await BrowserUse.launch();
-
-await browser.goto('https://app.example.com/login');
-await browser.fillForm({
-  '#email':    'user@example.com',
-  '#password': 'my-secret',
-});
-await browser.click('button[type="submit"]');
-await browser.waitForUrl('**/dashboard');
-await browser.screenshot({ path: 'dashboard.png', fullPage: true });
-
-// Next run will reuse the logged-in session via the profile
-await browser.close();
-```
-
-### CDP: extract data from an already open page
-
-```javascript
-const BrowserUse = require('./utils/browserUse');
-
-const browser = await BrowserUse.connectCDP();
-
-// Work with an already open tab
-const pages = browser.getPages();
-console.log(`Open tabs: ${pages.length}`);
-
-await browser.switchToPage(0);
-const html = await browser.getHtml();
-const title = await browser.getTitle();
-
-await browser.close(); // Chrome stays running
-```
-
-### Infinite scroll: load a feed and extract content
-
-```javascript
-const BrowserUse = require('./utils/browserUse');
-const getDataFromText = require('./utils/getDataFromText');
-
-const browser = await BrowserUse.launch();
-await browser.goto('https://news.example.com/feed');
-await browser.waitForLoadState('networkidle');
-
-// Scroll the feed, loading more posts (max 30 iterations, 60 sec)
-const result = await browser.scroll({
-  times: 30,
-  delay: 2000,
-  timeout: 60000,
-});
-console.log(`Scrolled ${result.iterations} times, reached bottom: ${result.reachedBottom}`);
-
-// Now all loaded content is in the DOM
-const html = await browser.getHtml();
-const data = getDataFromText(html);
-await browser.close();
-```
-
-### Download all images from an article
-
-```javascript
-const BrowserUse = require('./utils/browserUse');
-
-const browser = await BrowserUse.launch({ headless: true });
-await browser.goto('https://example.com/gallery');
-await browser.waitFor('.gallery-loaded', { state: 'visible' });
-
-const results = await browser.downloadImages({
-  selector: '.gallery img',
-  outputDir: './gallery-images',
-  minWidth: 300,
-  concurrency: 3,
-});
-
-console.log(`Downloaded: ${results.filter(r => r.success).length}`);
-await browser.close();
 ```
 
 ## CLI

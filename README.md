@@ -8,6 +8,8 @@ control Chrome, extract content/forms, save pages to Markdown (with images), and
 
 > “Local-first” here means: your browsing session lives in an isolated Chrome profile on your computer.
 
+> **CLI-first.** For agent tasks, prefer running the existing tools via CLI (`node scripts/...`, `node utils/...`). Avoid writing new JavaScript scripts; only do it as a last resort when the CLI tools cannot perform a required step.
+
 ## Why it competes
 
 - **Local-first browser automation**: real Google Chrome + isolated profile (`AgentProfile`) + CDP.
@@ -104,37 +106,12 @@ node scripts/googleSearch.js "playwright tutorial" --open 0 --dir ./archive/my-r
 
 `links.json` is intentionally stable: you can resume research later without re-running Google Search.
 
-## Usage (Node.js API)
+## Usage (advanced: Node.js API)
 
-### Low-level browser control
+The Node.js API exists primarily for **authoring/extending tools**. For normal tasks, prefer the CLI quickstart above.
 
-```javascript
-const BrowserUse = require('./utils/browserUse');
-
-const browser = await BrowserUse.launchCDP(); // recommended
-await browser.gotoAndWaitForContent('https://example.com');
-
-const html = await browser.getHtml();
-await browser.close(); // disconnects, Chrome can stay alive in launchCDP mode
-```
-
-### Google Search + content extraction
-
-```javascript
-const GoogleSearch = require('./scripts/googleSearch');
-
-const google = new GoogleSearch({ linksDir: './archive/my-research' });
-await google.init();
-
-await google.search('web scraping tools 2026');
-const links = await google.getLinks(); // also appends to links.json
-
-await google.openLink(0);
-await google.getContent({ dir: './archive/my-research', name: 'source-0.md' });
-await google.closeTab();
-
-await google.close();
-```
+- Low-level browser control: see [`utils/browserUse.md`](utils/browserUse.md)
+- Google Search + content extraction: see [`scripts/googleSearch.md`](scripts/googleSearch.md)
 
 ## Extending: add a site profile
 

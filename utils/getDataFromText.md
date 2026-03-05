@@ -2,6 +2,8 @@
 
 Cascade extractor for structural blocks from HTML pages: navigation, main content, forms. Extracted blocks are converted to Markdown via [Turndown](https://github.com/mixmark-io/turndown).
 
+> **CLI-first.** Prefer using the CLI (`node utils/getDataFromText.js ...`) for tasks. The API is intended for tool authors and advanced integrations. See `AGENTS.md` for the policy.
+
 ## Install
 
 ```bash
@@ -23,26 +25,9 @@ node utils/getDataFromText.js page.html output.json
 node utils/getDataFromText.js page.html output.json --raw
 ```
 
-### API
+### API (advanced)
 
-```javascript
-const getDataFromText = require("./utils/getDataFromText.js");
-
-// From an HTML string
-const result = getDataFromText(htmlString);
-
-// From a file
-const result = getDataFromText("page.html", { inputType: "file" });
-
-// Without Markdown conversion
-const result = getDataFromText(htmlString, { raw: true });
-
-// With saving to a file
-getDataFromText("page.html", {
-  inputType: "file",
-  outputFile: "output.json",
-});
-```
+The module can also be imported from Node.js, but the recommended interface is the CLI. See the **API options** section below.
 
 ## Output format
 

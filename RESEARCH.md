@@ -4,6 +4,8 @@ Instructions for running a high-quality research process via Google Search using
 
 Browser constraints (single-threaded, sequential access) are described in [AGENTS.md](AGENTS.md) and fully apply here.
 
+> **CLI-first.** Prefer running the repository tools via CLI (`node scripts/...`, `node utils/...`). Avoid writing custom JavaScript scripts; only do it as a last resort when the CLI tools cannot perform a required step.
+
 ---
 
 ## File structure
@@ -144,48 +146,42 @@ Example-specific (from the task):
 
 Take one query at a time. For each query:
 
-1. `googleSearch.search(query)` — run the search.
-2. `googleSearch.getLinks()` — get the SERP results **and save them to `links.json`** in the research working folder.
+1. Run the search and save a stable SERP snapshot (`links.json`) via CLI:
+
+   ```bash
+   node scripts/googleSearch.js "<query>" --links --dir archive/<YYYY>-<MM>-<DD>-<slug>/
+   ```
 
    - **Why this matters:** `links.json` is a stable artifact. It lets you continue research without re-running Google Search (which may change results). You can simply open the desired URL from the file.
-   - **How to enable saving:**
-     - **API:** `const google = new GoogleSearch({ linksDir: "archive/<...>/" })`
-     - **CLI:** pass `--dir archive/<...>/` even when you only print links (`--links`) so results are appended into `archive/<...>/links.json`.
+   - **Saving rule:** always pass `--dir archive/<...>/` even when you only print links (`--links`) so results are appended into `archive/<...>/links.json`.
 
    The `links.json` format is documented in [`scripts/googleSearch.md`](scripts/googleSearch.md).
 
-3. For each relevant link, run the **full 4-step loop**:
+2. For each relevant result index `i`, open it and save content to Markdown via CLI:
 
-```
-openLink(i)
-  ↓
-getContent({ dir: "archive/<YYYY>-<MM>-<DD>-<slug>", name: "<page-slug>.md" })
-  ↓
-▶ WRITE insights to insights.md (append to the file on disk — NOW, not later)
-  ↓
-closeTab()
-```
+   ```bash
+   node scripts/googleSearch.js "<query>" --open <i> --dir archive/<YYYY>-<MM>-<DD>-<slug>/ --name <page-slug>.md
+   ```
+
+3. Immediately after each saved page, append insights to `insights.md` **on disk** (NOW, not later).
 
 **Writing insights is part of the link-processing loop, not a separate later step.** Do not open the next link until you have written insights from the current page to disk. This guarantees that if the agent gets interrupted, everything already processed is preserved.
 
 4. **Empty or minimal content.** If `getContent` returns empty Markdown or only header/menu — the page likely renders via JavaScript. Do not skip it: apply the **escalation strategy** from “Reliable content extraction” in [AGENTS.md](AGENTS.md):
 
-   - Try `browser.gotoAndWaitForContent(url)` (wait for DOM stabilization).
-   - Extract text directly: `browser.evaluate(() => document.body.innerText)`.
-   - Take a screenshot: `browser.screenshot({ path: 'debug.png', fullPage: true })`.
-   - If content loads on scroll — scroll before extraction.
+   - Try a CLI “wait + extract” run: `node utils/browserUse.js <url> --wait "<selector>" --extract out.json`
+   - Take a screenshot for visual verification: `node utils/browserUse.js <url> --screenshot debug.png --full-page`
+   - If the page requires scrolling to load content — automated scrolling is an advanced / last-resort case (API).
 
    Record whatever you obtained in `insights.md` (text, screenshot summary). Only if none works — record the failure + URL and move on.
 
-5. **Infinite-scroll pages.** If the page loads content on scroll (feeds, forums, trending pages), scroll before `getContent`:
+5. **Infinite-scroll pages.** If the page loads content on scroll (feeds, forums, trending pages), fully automated scrolling requires programmatic control (API) and should be treated as a last resort. If the page is critical, capture what you can (content/screenshot), record the limitation in `insights.md`, and only then consider a minimal script.
 
-   ```javascript
-   await browser.scroll({ times: 10, delay: 1500 });
+6. For each query, review **5–10 relevant links**. If page 1 is weak — collect links from additional pages via CLI (example):
+
+   ```bash
+   node scripts/googleSearch.js "<query>" --page 2 --links --dir archive/<YYYY>-<MM>-<DD>-<slug>/
    ```
-
-   The method stops early if content stops loading (`reachedBottom: true`).
-
-6. For each query, review **5–10 relevant links**. If the SERP page has little useful content — call `goToPage` to move to the next page.
 
 **Target volume: 40–60 pages reviewed** across the entire research.
 

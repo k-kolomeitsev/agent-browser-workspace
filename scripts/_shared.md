@@ -7,6 +7,8 @@ It also contains the **site profile registry** (`scripts/sites/*.json`) — conf
 - rules/selectors for scraping specific sites (e.g. Google SERP);
 - UI controls (selectors + action descriptions) that are useful to include in an agent response when working with the given host.
 
+> **Internal / advanced.** This module is meant for authors of new CLI tools in `scripts/`. For agent tasks, do not use it directly — run the existing CLI scripts instead (see `AGENTS.md`).
+
 ## API
 
 ### `initBrowser(options)`
